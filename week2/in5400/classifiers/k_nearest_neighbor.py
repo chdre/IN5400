@@ -78,10 +78,9 @@ class KNearestNeighbor(object):
     #                                                                       #
     #########################################################################
 
-    x, y = np.meshgrid(X, self.X)
-
-    dists = x - y
-
+    sums = np.sum(np.square(X)[:,np.newaxis,:], axis=2) - 2 * X.dot(self.X_train.T) \
+        + np.sum(np.square(self.X_train), axis=1)
+    dists = np.sqrt(sums)
 
     #########################################################################
     #                         END OF YOUR CODE                              #
@@ -105,6 +104,7 @@ class KNearestNeighbor(object):
     num_test = dists.shape[0]
     y_pred = np.zeros(num_test)
     closest_y = np.zeros((1,k),dtype='int32')
+
     for i in range(0,num_test):
       # A list of length k storing the labels of the k nearest neighbors to
       # the ith test point.
@@ -117,11 +117,8 @@ class KNearestNeighbor(object):
       # Hint: Look up the function numpy.argsort.                             #
       #########################################################################
 
-      #closest_y = []
-
-      pass
-
-
+      sorted_ind = np.argsort(dists[i])
+      closest_y = self.y_train[sorted_ind[:k]]
 
       #########################################################################
       # TODO:                                                                 #
@@ -131,7 +128,10 @@ class KNearestNeighbor(object):
       # label.                                                                #
       #########################################################################
 
-      #y_pred[i] = []...
+      val, counts = np.unique(closest_y, return_counts=True)    # val sorted by smallest value
+      max_count_ind = np.argmax(counts) # Returns the first (left to right) argmax
+
+      y_pred[i] = val[max_count_ind]
 
       #########################################################################
       #                           END OF YOUR CODE                            #
