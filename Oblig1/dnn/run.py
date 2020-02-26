@@ -104,7 +104,7 @@ def train(conf, X_train, Y_train, X_devel, Y_devel):
         if step % conf['train_progress'] == 0:
             elapsed_time = time.time() - start_time
             sec_per_batch = elapsed_time / conf['train_progress']
-            examples_per_sec = conf['batch_size']*conf['train_progress'] / elapsed_time
+            examples_per_sec = conf['batch_size']*conf['train_progress']# / elapsed_time
             ccr = num_correct / conf['batch_size']
             running_ccr = (num_correct_since_last_check /
                            conf['train_progress'] / conf['batch_size'])

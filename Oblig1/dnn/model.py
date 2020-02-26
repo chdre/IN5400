@@ -44,20 +44,19 @@ def initialization(conf):
                 the network.
     """
     # TODO: Task 1.1
-    vals = conf['layer_dimensions']
-    N_W = len(vals) - 1
-    N_b = len(vals)
+    vals = np.asarray(conf['layer_dimensions'])
+    layers = vals.shape[0]
 
-    scale = 2 / vals[-2]
+    scale = np.sqrt(2 / vals)
 
-    params = {
-        'W_1': np.random.normal(scale=scale, size=(vals[0], vals[1])),
-        'W_2': np.random.normal(scale=scale, size=(vals[1], vals[2])),
-        'W_3': np.random.normal(scale=scale, size=(vals[2], vals[3])),
-        'b_1': np.zeros((vals[1], 1)),
-        'b_2': np.zeros((vals[2], 1)),
-        'b_3': np.zeros((vals[3], 1))
-        }
+    params = {}
+
+    for i in range(1, layers):
+        W = np.random.normal(scale=scale[i-1], size=(vals[i-1], vals[i]))
+        b = np.zeros((vals[i], 1))
+
+        params[f'W_{i}'] = W
+        params[f'b_{i}'] = b
 
     return params
 
@@ -72,7 +71,13 @@ def activation(Z, activation_function):
     """
     # TODO: Task 1.2 a)
     if activation_function == 'relu':
-        return np.max(0, Z)
+        return np.maximum(0, Z)
+    elif activation_function == 'leaky_relu':
+        return np.maximum(0.01 * Z, Z)
+    elif activation_function == 'tanh':
+        return np.tanh(Z)
+    elif activation_function == 'sigmoid':
+        return 1 / (1 + np.exp(-Z))
     else:
         print("Error: Unimplemented activation function: {}", activation_function)
         return None
@@ -92,8 +97,10 @@ def softmax(Z):
         numpy array of floats with shape [n, m]
     """
     # TODO: Task 1.2 b)
-    Z -= np.max(Z)
-    return np.exp(Z - np.log(Z))
+    Z_new = Z -  np.max(Z)  # So not to overwrite features[Z_L]
+    t = Z_new - np.log(np.sum(np.exp(Z_new), axis=0)[np.newaxis, :])
+
+    return np.exp(t)
 
 
 def forward(conf, X_batch, params, is_training):
@@ -118,8 +125,22 @@ def forward(conf, X_batch, params, is_training):
                We cache them in order to use them when computing gradients in the backpropagation.
     """
     # TODO: Task 1.2 c)
-    Y_proposed = None
-    features = None
+    layers = len(conf['layer_dimensions'])
+
+    features = {}
+    features['A_0'] = X_batch   # Initializing with the image
+
+    # Hidden layers
+    for i in range(1, layers):
+        W = params[f'W_{i}']
+        a = features[f'A_{i-1}']
+        b = params[f'b_{i}']
+
+        Z = W.T @ a + b
+        features[f'Z_{i}'] = Z
+        features[f'A_{i}'] = activation(Z, conf['activation_function'])
+
+    Y_proposed = softmax(features['Z_' + str(layers - 1)])
 
     return Y_proposed, features
 
@@ -137,8 +158,12 @@ def cross_entropy_cost(Y_proposed, Y_reference):
         num_correct: Scalar integer
     """
     # TODO: Task 1.3
-    cost = None
-    num_correct = None
+    m = Y_proposed.shape[1]
+
+    cost = - 1 / m  * np.sum(np.sum(Y_reference * np.log(Y_proposed), axis=1), axis=0)
+
+    num_correct = np.sum((np.argmax(Y_proposed, axis=0) ==
+                            np.argmax(Y_reference, axis=0)))
 
     return cost, num_correct
 
@@ -153,7 +178,16 @@ def activation_derivative(Z, activation_function):
     """
     # TODO: Task 1.4 a)
     if activation_function == 'relu':
-        return None
+        return np.heaviside(Z, 1)
+    elif activation_function == 'leaky_relu':
+        d = np.zeros_like(Z)
+        d[Z <= 0] = 0.01
+        d[Z > 0] = 1
+        return d
+    elif activation_function == 'tanh':
+        return 1 - np.square(Z)
+    elif activation_function == 'sigmoid':
+        return Z * (1 - Z)
     else:
         print("Error: Unimplemented derivative of activation function: {}", activation_function)
         return None
@@ -177,7 +211,33 @@ def backward(conf, Y_proposed, Y_reference, params, features):
                 - the gradient of the biases grad_b^[l] for l in [1, L].
     """
     # TODO: Task 1.4 b)
-    grad_params = None
+    layers = len(conf['layer_dimensions'])
+
+    m = Y_proposed.shape[1]
+    m_inv = 1 / m   #
+
+    grad_params = {}
+
+    # Last layer
+    delta_old = Y_proposed - Y_reference    # Derivative of the cost function wrt z
+    grad_params[f'grad_W_{layers - 1}'] = features[f'A_{layers - 2}'] \
+                                                @ delta_old.T * m_inv
+    grad_params[f'grad_b_{layers - 1}'] = delta_old @ np.ones((m,1)) * m_inv
+
+    # All but last layer
+    for i in range(layers - 2, 0, -1):
+        w_next = params[f'W_{i+1}']
+        a_prev = features[f'A_{i-1}']
+        z = features[f'Z_{i}']
+
+        g_prime = activation_derivative(z, conf['activation_function'])
+
+        delta = g_prime * (w_next @ delta_old)
+        grad_params[f'grad_W_{i}'] = a_prev @ delta.T / m
+        grad_params[f'grad_b_{i}'] = delta @ np.ones((m,1)) / m
+
+        delta_old = delta
+
     return grad_params
 
 
@@ -193,5 +253,11 @@ def gradient_descent_update(conf, params, grad_params):
         params: Updated parameter dictionary.
     """
     # TODO: Task 1.5
-    updated_params = None
+    lr = conf['learning_rate']
+
+    updated_params = {}
+
+    for key, vals in params.items():
+        updated_params[key] = vals - lr * grad_params[f'grad_{key}']
+
     return updated_params
