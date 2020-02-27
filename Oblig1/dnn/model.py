@@ -52,7 +52,7 @@ def initialization(conf):
     params = {}
 
     for i in range(1, layers):
-        W = np.random.normal(scale=scale[i-1], size=(vals[i-1], vals[i]))
+        W = np.random.normal(scale=scale[i - 1], size=(vals[i - 1], vals[i]))
         b = np.zeros((vals[i], 1))
 
         params[f'W_{i}'] = W
@@ -97,7 +97,7 @@ def softmax(Z):
         numpy array of floats with shape [n, m]
     """
     # TODO: Task 1.2 b)
-    Z_new = Z -  np.max(Z)  # So not to overwrite features[Z_L]
+    Z_new = Z - np.max(Z)  # So not to overwrite features[Z_L]
     t = Z_new - np.log(np.sum(np.exp(Z_new), axis=0)[np.newaxis, :])
 
     return np.exp(t)
@@ -160,10 +160,11 @@ def cross_entropy_cost(Y_proposed, Y_reference):
     # TODO: Task 1.3
     m = Y_proposed.shape[1]
 
-    cost = - 1 / m  * np.sum(np.sum(Y_reference * np.log(Y_proposed), axis=1), axis=0)
+    cost = - 1 / m * \
+        np.sum(np.sum(Y_reference * np.log(Y_proposed), axis=1), axis=0)
 
     num_correct = np.sum((np.argmax(Y_proposed, axis=0) ==
-                            np.argmax(Y_reference, axis=0)))
+                          np.argmax(Y_reference, axis=0)))
 
     return cost, num_correct
 
@@ -189,7 +190,8 @@ def activation_derivative(Z, activation_function):
     elif activation_function == 'sigmoid':
         return Z * (1 - Z)
     else:
-        print("Error: Unimplemented derivative of activation function: {}", activation_function)
+        print("Error: Unimplemented derivative of activation function: {}",
+              activation_function)
         return None
 
 
@@ -221,8 +223,8 @@ def backward(conf, Y_proposed, Y_reference, params, features):
     # Last layer
     delta_old = Y_proposed - Y_reference    # Derivative of the cost function wrt z
     grad_params[f'grad_W_{layers - 1}'] = features[f'A_{layers - 2}'] \
-                                                @ delta_old.T * m_inv
-    grad_params[f'grad_b_{layers - 1}'] = delta_old @ np.ones((m,1)) * m_inv
+        @ delta_old.T * m_inv
+    grad_params[f'grad_b_{layers - 1}'] = delta_old @ np.ones((m, 1)) * m_inv
 
     # All but last layer
     for i in range(layers - 2, 0, -1):
@@ -234,7 +236,7 @@ def backward(conf, Y_proposed, Y_reference, params, features):
 
         delta = g_prime * (w_next @ delta_old)
         grad_params[f'grad_W_{i}'] = a_prev @ delta.T / m
-        grad_params[f'grad_b_{i}'] = delta @ np.ones((m,1)) / m
+        grad_params[f'grad_b_{i}'] = delta @ np.ones((m, 1)) / m
 
         delta_old = delta
 
