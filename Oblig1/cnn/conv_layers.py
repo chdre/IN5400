@@ -58,9 +58,6 @@ def conv_layer_forward(input_layer, weight, bias, pad_size=1, stride=1):
                     sum = np.sum(sum, axis=0)   # Summing over channels
                     output_layer[i, j, p_ind, q_ind] = sum + bias[j]
 
-    # Should have shape (batch_size, num_filters, height_y, width_y)
-    # output_layer = None
-
     assert channels_w == channels_x, (
         "The number of filter channels be the same as the number of input layer channels")
 
@@ -90,14 +87,10 @@ def conv_layer_backward(output_layer_gradient, input_layer, weight, bias, pad_si
     batch_size, channels_x, height_x, width_x = input_layer.shape
     num_filters, channels_w, height_w, width_w = weight.shape
 
-    print(output_layer_gradient.shape)
-    print(input_layer.shape)
-    print(weight.shape)
-
     bias_gradient = np.zeros(num_filters)
     weight_gradient = np.zeros((num_filters, channels_w, height_w, width_w))
     input_layer_gradient = np.zeros(
-        (num_filters, channels_y, height_y, width_y))
+        (batch_size, channels_x, height_x, width_x))
 
     K = pad_size
 
@@ -107,33 +100,29 @@ def conv_layer_backward(output_layer_gradient, input_layer, weight, bias, pad_si
                                                            (K, K), (K, K)),  'constant')
 
     for j in range(num_filters):
-        for i in range(batch_size):
-            for k in range(channels_x):
-                for r in range(-K, K + 1, 1):
-                    for s in range(-K, K + 1, 1):
-                        b_sum = 0
-                        w_sum = 0
-                        x_sum = 0
-                        for p in range(1, height_y + 1):
-                            for q in range(1, width_y + 1):
-                                w_sum += (output_layer_gradient[i, j, p, q]
-                                          * input_layer[i, k, p + r, q + s])
-                                b_sum += output_layer_gradient[i, j, p, q]
+        for k in range(channels_x):
+            for r in range(-K, K + 1, 1):
+                for s in range(-K, K + 1, 1):
+                    b_sum = 0
+                    w_sum = 0
+                    for p in range(1, height_y + 1):
+                        for q in range(1, width_y + 1):
+                            w_sum += (output_layer_gradient[:, j, p, q]
+                                      * input_layer[:, k, p + r, q + s])
+                            b_sum += output_layer_gradient[:, j, p, q]
+                    weight_gradient[j, k, r + 1, s + 1] = np.sum(w_sum)
+        bias_gradient[j] = np.sum(b_sum)
 
-                        weight_gradient[j, k, r + 1, s + 1] = w_sum
-
-            bias_gradient[j] = b_sum
-
-            for k_w in range(channels_w):
-                for r in range(-K, K + 1, 1):
-                    for s in range(-K, K + 1, 1):
-                        x_sum = 0
-                        for m in range(height_w):
-                            for n in range(width_w):
-                                x_sum += (output_layer_gradient[i, j, m, n]
-                                          * weight[j, k, m, n])
-
-                        input_layer_gradient[j, k, r, s] = x_sum
+    for k in range(channels_x):
+        for p in range(1, height_x + 1):
+            for q in range(1, width_x + 1):
+                sum = 0
+                for j in range(channels_y):
+                    for r in range(-K, K + 1, 1):
+                        for s in range(-K, K + 1, 1):
+                            sum += (output_layer_gradient[:, j, p + r, q + s]
+                                    * weight[j, k, -r + 1, -s + 1])
+                input_layer_gradient[:, k, p - 1, q - 1] = sum
 
     assert num_filters == channels_y, (
         "The number of filters must be the same as the number of output layer channels")
